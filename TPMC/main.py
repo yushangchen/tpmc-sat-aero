@@ -369,9 +369,14 @@ def save_result_to_csv(result: dict, filename: str = "tpmc_stl_single_run.csv"):
 
 def main():
     # ===== user settings =====
-    stl_path = r"G:\我的雲端硬碟\TPMC\testcube.stl"
-    atmosphere_path = r"G:\我的雲端硬碟\TPMC\nrlmsis_output.txt"
-    face_map_csv = r"G:\我的雲端硬碟\TPMC\face_surface_map.csv"
+    def main():
+    # ===== user settings =====
+    base_dir = Path(__file__).resolve().parent
+
+    stl_path = str(base_dir / "testcube.STL")
+    atmosphere_path = str(base_dir / "nrlmsis_output.txt")
+    face_map_csv = str(base_dir / "face_surface_map.csv")
+
     target_alt_km = 500.0
 
     scale_factor = 0.001
