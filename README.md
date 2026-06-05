@@ -1,191 +1,350 @@
 # TPMC-Sat-Aero
 
-**TPMC-Sat-Aero** is a Python-based **Test Particle Monte Carlo (TPMC)** solver for rapid aerodynamic coefficient estimation of satellites, CubeSats, and deorbit drag-sail configurations in rarefied orbital flow conditions.
+**TPMC-Sat-Aero** is a Python-based **Test Particle Monte Carlo (TPMC)** code for rapid aerodynamic force and coefficient estimation of simple satellite geometries in rarefied orbital flow.
 
-The solver is intended for **free-molecular** and **high-Knudsen-number** regimes, where intermolecular collisions are negligible and gas-surface interactions dominate the aerodynamic force. It tracks incident test particles, computes gas-surface momentum exchange, and estimates aerodynamic force, moment, and drag coefficients for arbitrary triangulated geometries.
-
-This project is designed as a research-oriented tool for preliminary satellite aerodynamic analysis and future comparison with **Direct Simulation Monte Carlo (DSMC)** reference simulations.
+The current version is organized as a research prototype. It reads an STL geometry, applies optional scaling and attitude rotation, samples incident particles from an NRLMSIS-based atmosphere file, performs particle-surface interaction modeling, and outputs force, moment, and aerodynamic coefficients.
 
 ---
 
-## 1. Project Motivation
+## 1. Current Project Status
 
-Aerodynamic drag is one of the dominant perturbation forces for satellites in Low Earth Orbit (LEO), especially for CubeSats, drag-sail systems, and very-low-Earth-orbit missions.
+This repository is currently in the **research-prototype stage**.
 
-A common assumption in preliminary orbital lifetime analysis is to use a constant drag coefficient, such as:
+The present code focuses on:
 
-```math
-C_D = 2.2
-```
+- STL-based geometry loading
+- Cube test-case analysis
+- face-to-surface mapping
+- NRLMSIS atmosphere-file input
+- incident particle sampling
+- particle tracing
+- gas-surface interaction modeling
+- aerodynamic force and moment tallying
+- drag, side-force, lift, and moment coefficient output
 
-However, the actual aerodynamic coefficient depends on:
-
-- satellite geometry,
-- attitude angle,
-- gas-surface interaction model,
-- atmospheric density and composition,
-- orbital altitude,
-- molecular speed ratio,
-- Knudsen number,
-- surface reflection properties.
-
-DSMC can provide accurate rarefied-flow simulations but is computationally expensive. TPMC provides a faster alternative in the free-molecular regime by neglecting intermolecular collisions and focusing on particle-surface interactions.
-
-The goal of this project is to provide a fast and flexible TPMC-based workflow for estimating aerodynamic coefficients and preparing reference cases for DSMC comparison.
+The code is not yet packaged as an installable Python module. The present workflow is script-based.
 
 ---
 
-## 2. Main Features
+## 2. Current Repository Structure
 
-- Import arbitrary satellite geometry from STL files.
-- Support triangulated surface meshes.
-- Generate incoming test particles based on free-stream flow conditions.
-- Compute particle-surface intersections.
-- Model gas-surface momentum exchange.
-- Support diffuse and specular reflection models.
-- Estimate aerodynamic force and moment.
-- Compute drag coefficient.
-- Perform particle-number convergence tests.
-- Export force, moment, coefficient, and particle-hit statistics.
-- Suitable for CubeSat, drag-sail, and simplified spacecraft configurations.
-- Designed for future DSMC reference validation.
-
-The drag coefficient is defined as:
-
-```math
-C_D = \frac{F_D}{\frac{1}{2}\rho V_\infty^2 A_{ref}}
-```
-
-where:
-
-- `F_D` is the aerodynamic force component opposite to the free-stream direction,
-- `rho` is the atmospheric mass density,
-- `V_inf` is the free-stream velocity,
-- `A_ref` is the reference area.
-
----
-
-## 3. Physical Assumptions
-
-The current TPMC model is based on the following assumptions:
-
-1. The flow is in the free-molecular or high-Knudsen-number regime.
-2. Intermolecular collisions are neglected.
-3. Test particles travel in straight-line trajectories before surface collision.
-4. Gas-surface interaction dominates the momentum exchange.
-5. The satellite geometry is treated as a triangulated surface mesh.
-6. The incident flow is uniform.
-7. The wall temperature is prescribed.
-8. The aerodynamic coefficients are obtained from statistical averaging over many test particles.
-
-This method is suitable when:
-
-```math
-Kn = \frac{\lambda}{L} \gg 1
-```
-
-where `lambda` is the molecular mean free path and `L` is the characteristic length of the satellite.
-
----
-
-## 4. TPMC and DSMC Comparison Philosophy
-
-TPMC and DSMC use different particle concepts.
-
-In DSMC, one simulator particle represents many real gas molecules and the method includes molecular collisions inside computational cells.
-
-In TPMC, particles are sampling particles used to estimate the momentum exchange between incoming gas molecules and the satellite surface.
-
-Therefore, TPMC and DSMC should not be compared using identical particle numbers. Instead, both methods should be compared under identical physical conditions after each method has reached its own convergence criterion.
-
-Recommended comparison procedure:
-
-1. Use the same geometry.
-2. Use the same atmospheric condition.
-3. Use the same free-stream velocity.
-4. Use the same attitude angle.
-5. Use the same gas-surface interaction model.
-6. Run TPMC particle-number convergence.
-7. Run DSMC reference simulations at selected altitudes.
-8. Compare the converged aerodynamic coefficients.
-
-The relative difference can be evaluated as:
-
-```math
-\eta =
-\frac{C_{D,\mathrm{TPMC}} - C_{D,\mathrm{DSMC}}}
-{C_{D,\mathrm{DSMC}}}
-\times 100\%
-```
-
----
-
-## 5. Recommended Repository Structure
-
-The recommended repository structure is:
+The current repository structure is:
 
 ```text
 tpmc-sat-aero/
 │
 ├── README.md
 ├── LICENSE
-├── requirements.txt
 ├── .gitignore
 │
-├── src/
-│   └── tpmc_sat_aero/
-│       ├── __init__.py
-│       ├── main.py
-│       ├── geometry.py
-│       ├── particle.py
-│       ├── surface.py
-│       ├── gas_surface.py
-│       ├── solver.py
-│       ├── coefficients.py
-│       └── utils.py
-│
-├── cases/
-│   ├── cube_basic/
-│   │   ├── config.yaml
-│   │   └── geometry.stl
-│   │
-│   └── drag_sail/
-│       ├── config.yaml
-│       └── geometry.stl
-│
-├── examples/
-│   ├── run_cube.py
-│   ├── run_drag_sail.py
-│   ├── convergence_test.py
-│   ├── altitude_sweep.py
-│   └── attitude_sweep.py
-│
-├── results/
-│   └── README.md
-│
-└── docs/
-    ├── methodology.md
-    └── theory.md
+└── TPMC/
+    │
+    ├── main.py
+    ├── build_cube_face_map.py
+    ├── testcube.STL
+    ├── face_surface_map.csv
+    ├── nrlmsis_output.txt
+    ├── tpmc_results.csv
+    ├── tpmc_stl_single_run.csv
+    ├── desktop.ini
+    │
+    ├── geometry/
+    │   ├── loader.py
+    │   ├── primitives.py
+    │   ├── transform.py
+    │   ├── desktop.ini
+    │   └── __pycache__/
+    │
+    └── physics/
+        ├── atmosphere_nrlmsis.py
+        ├── coefficients.py
+        ├── gsi.py
+        ├── inflow.py
+        ├── intersect.py
+        ├── particle_force_contribution.py
+        ├── reference.py
+        ├── reflection.py
+        ├── source.py
+        ├── surface_model.py
+        ├── tally.py
+        ├── tracer.py
+        ├── desktop.ini
+        └── __pycache__/
 ```
 
-If the current code structure is different, users can still follow the same workflow by modifying the paths in the configuration file.
+### Folder Description
+
+| Path | Purpose |
+|---|---|
+| `TPMC/main.py` | Main execution script for the STL-based TPMC single-run case |
+| `TPMC/build_cube_face_map.py` | Utility script for generating a cube face-to-surface mapping CSV |
+| `TPMC/testcube.STL` | Example cube geometry |
+| `TPMC/face_surface_map.csv` | Face index to surface-name mapping table |
+| `TPMC/nrlmsis_output.txt` | Atmospheric input data generated from NRLMSIS |
+| `TPMC/tpmc_stl_single_run.csv` | Output file from the STL single-run case |
+| `TPMC/geometry/` | Geometry loading, primitive handling, and attitude transformation |
+| `TPMC/physics/` | Atmosphere, inflow, tracing, reflection, GSI, force, moment, and coefficient models |
 
 ---
 
-## 6. Installation
+## 3. Program Architecture
 
-### 6.1 Clone the Repository
+The code is divided into two major internal modules:
+
+```text
+geometry/  -> geometry loading and coordinate transformation
+physics/   -> physical modeling and TPMC particle calculation
+```
+
+### 3.1 Geometry Module
+
+The `geometry` module handles STL import, mesh scaling, mesh recentering, bounding-box evaluation, and attitude transformation.
+
+Current files:
+
+```text
+TPMC/geometry/
+├── loader.py
+├── primitives.py
+└── transform.py
+```
+
+Typical responsibilities:
+
+- load STL geometry
+- compute mesh normals
+- compute bounding box
+- recenter geometry
+- scale geometry
+- rotate geometry by yaw, pitch, and roll
+
+---
+
+### 3.2 Physics Module
+
+The `physics` module handles atmospheric properties, inflow particle sampling, surface models, particle tracing, reflection models, force contribution, and coefficient calculation.
+
+Current files:
+
+```text
+TPMC/physics/
+├── atmosphere_nrlmsis.py
+├── coefficients.py
+├── gsi.py
+├── inflow.py
+├── intersect.py
+├── particle_force_contribution.py
+├── reference.py
+├── reflection.py
+├── source.py
+├── surface_model.py
+├── tally.py
+└── tracer.py
+```
+
+Typical responsibilities:
+
+- read NRLMSIS atmosphere data
+- select atmospheric state at target altitude
+- sample species from atmospheric composition
+- compute incident molecular flux
+- generate source-plane particles
+- trace particles toward the geometry
+- handle particle-surface interaction
+- compute force and moment contribution
+- compute aerodynamic coefficients
+
+---
+
+## 4. Physical Model
+
+The present TPMC model assumes a rarefied orbital flow condition where intermolecular collisions are negligible.
+
+The basic assumptions are:
+
+1. Gas molecules are represented by sampled test particles.
+2. Incoming particles are sampled from a source plane upstream of the body.
+3. Particles move in straight lines before impact.
+4. Particle-surface interaction is modeled through the gas-surface interaction model.
+5. Total force and moment are obtained by summing momentum exchange from all sampled particles.
+6. Aerodynamic coefficients are calculated from the accumulated force and moment.
+
+The drag coefficient is defined as:
+
+```math
+C_D = \frac{F_D}{q_\infty A_{ref}}
+```
+
+where:
+
+```math
+q_\infty = \frac{1}{2}\rho_\infty V_\infty^2
+```
+
+and:
+
+- `F_D` is the drag force
+- `rho_inf` is the atmospheric mass density
+- `V_inf` is the free-stream velocity
+- `A_ref` is the reference area
+
+---
+
+## 5. Gas-Surface Interaction
+
+The current code supports surface-dependent gas-surface interaction settings through the surface model.
+
+The surface model is built in `main.py` by the function:
+
+```python
+build_surface_model(face_map_csv)
+```
+
+In the current cube test case, different cube faces can be assigned different surface names:
+
+```text
+x_minus
+x_plus
+y_minus
+y_plus
+z_minus
+z_plus
+default
+```
+
+These surface names are connected to gas-surface interaction models such as:
+
+```text
+diffuse
+cll
+```
+
+The face-to-surface relationship is stored in:
+
+```text
+TPMC/face_surface_map.csv
+```
+
+---
+
+## 6. Input Files
+
+The current workflow uses three major input files:
+
+```text
+TPMC/testcube.STL
+TPMC/nrlmsis_output.txt
+TPMC/face_surface_map.csv
+```
+
+### 6.1 STL Geometry
+
+Current example geometry:
+
+```text
+TPMC/testcube.STL
+```
+
+The geometry is loaded in `main.py` through:
+
+```python
+stl_path = r"G:\我的雲端硬碟\TPMC\testcube.stl"
+```
+
+Before running the code on a different computer, this path must be changed to the local path of the STL file.
+
+Example relative-path version:
+
+```python
+stl_path = r"testcube.STL"
+```
+
+or:
+
+```python
+stl_path = str(Path(__file__).resolve().parent / "testcube.STL")
+```
+
+---
+
+### 6.2 NRLMSIS Atmosphere File
+
+Current atmosphere input file:
+
+```text
+TPMC/nrlmsis_output.txt
+```
+
+The file is read in `main.py` through:
+
+```python
+atmosphere_path = r"G:\我的雲端硬碟\TPMC\nrlmsis_output.txt"
+```
+
+Before running on a different computer, change it to:
+
+```python
+atmosphere_path = r"nrlmsis_output.txt"
+```
+
+or:
+
+```python
+atmosphere_path = str(Path(__file__).resolve().parent / "nrlmsis_output.txt")
+```
+
+---
+
+### 6.3 Face Surface Map
+
+Current face-surface map:
+
+```text
+TPMC/face_surface_map.csv
+```
+
+The file maps each STL face index to a surface name.
+
+Example format:
+
+```csv
+face_index,surface_name
+0,x_minus
+1,x_minus
+2,x_plus
+3,x_plus
+```
+
+In `main.py`, the current hard-coded path is:
+
+```python
+face_map_csv = r"G:\我的雲端硬碟\TPMC\face_surface_map.csv"
+```
+
+Before running on a different computer, change it to:
+
+```python
+face_map_csv = r"face_surface_map.csv"
+```
+
+or:
+
+```python
+face_map_csv = str(Path(__file__).resolve().parent / "face_surface_map.csv")
+```
+
+---
+
+## 7. Installation
+
+### 7.1 Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/tpmc-sat-aero.git
+git clone https://github.com/yushangchen/tpmc-sat-aero.git
 cd tpmc-sat-aero
 ```
 
-Replace `your-username` with your actual GitHub username.
-
----
-
-### 6.2 Create a Python Virtual Environment
+### 7.2 Create a Python Virtual Environment
 
 #### Windows PowerShell
 
@@ -194,7 +353,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-If PowerShell blocks the activation script, run:
+If PowerShell blocks the activation script:
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -213,21 +372,19 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
----
+### 7.3 Install Required Packages
 
-### 6.3 Install Dependencies
+The current code uses common scientific Python packages.
 
-```bash
-pip install -r requirements.txt
-```
-
-If `requirements.txt` has not been created yet, install the basic packages manually:
+Install the basic packages:
 
 ```bash
-pip install numpy scipy pandas matplotlib trimesh pyyaml tqdm
+pip install numpy scipy pandas matplotlib trimesh
 ```
 
-Then generate `requirements.txt`:
+If additional packages are required by later versions, install them according to the import error message.
+
+A recommended `requirements.txt` can be generated by:
 
 ```bash
 pip freeze > requirements.txt
@@ -235,227 +392,286 @@ pip freeze > requirements.txt
 
 ---
 
-## 7. Input Files
+## 8. How to Run the Current Code
 
-A typical case requires two main input files:
-
-1. Geometry file
-2. Configuration file
-
----
-
-### 7.1 Geometry File
-
-The geometry should be provided as an STL file:
+The current version is script-based. The main working directory should be:
 
 ```text
-geometry.stl
+tpmc-sat-aero/TPMC/
 ```
 
-The STL file should satisfy the following requirements:
-
-- The geometry should be watertight if possible.
-- Surface normals should be consistently oriented.
-- The geometry should be in SI units, preferably meters.
-- The model should be centered around the intended reference point.
-- Very small gaps or duplicated surfaces should be avoided.
-- The reference area should be defined separately in the configuration file.
-
-Example:
-
-```text
-cases/cube_basic/geometry.stl
-```
-
----
-
-### 7.2 Configuration File
-
-The simulation settings are defined in a YAML file:
-
-```text
-config.yaml
-```
-
-Example:
-
-```yaml
-case_name: cube_basic
-
-geometry:
-  file: cases/cube_basic/geometry.stl
-  length_unit: m
-  reference_area: 0.01
-  reference_length: 0.1
-  center_of_mass: [0.0, 0.0, 0.0]
-
-flow:
-  altitude_km: 300
-  density: 1.92e-11
-  temperature: 976.0
-  velocity: 7730.0
-  direction: [-1.0, 0.0, 0.0]
-
-gas:
-  species: atomic_oxygen
-  molecular_mass: 2.656e-26
-  number_density: 6.51e14
-
-surface:
-  wall_temperature: 350.0
-  reflection_model: diffuse
-  accommodation_coefficient: 1.0
-  diffuse_fraction: 1.0
-
-simulation:
-  number_of_particles: 100000
-  random_seed: 42
-  batch_size: 10000
-
-output:
-  directory: results/cube_basic
-  save_particle_hits: true
-  save_force_history: true
-  save_summary_csv: true
-```
-
----
-
-## 8. Running a Simulation
-
-### 8.1 Run a Basic Example
-
-If the repository contains example scripts:
+Move into the TPMC folder:
 
 ```bash
-python examples/run_cube.py
+cd TPMC
 ```
 
-or:
+---
+
+### 8.1 Step 1: Check or Generate the Face Surface Map
+
+If `face_surface_map.csv` already exists, this step can be skipped.
+
+To regenerate the cube face-surface map:
 
 ```bash
-python examples/run_drag_sail.py
+python build_cube_face_map.py
 ```
 
----
-
-### 8.2 Run with a Configuration File
-
-If the main solver supports command-line execution:
-
-```bash
-python src/tpmc_sat_aero/main.py --config cases/cube_basic/config.yaml
-```
-
-For a drag-sail case:
-
-```bash
-python src/tpmc_sat_aero/main.py --config cases/drag_sail/config.yaml
-```
-
----
-
-### 8.3 Recommended Workflow
-
-The recommended TPMC workflow is:
+This script reads the cube STL file, classifies each face according to its surface normal direction, and writes:
 
 ```text
-1. Prepare STL geometry.
-2. Check geometry unit and orientation.
-3. Define reference area and reference length.
-4. Prepare atmospheric and flow conditions.
-5. Define gas-surface interaction model.
-6. Run a small particle-number test.
-7. Run a full simulation.
-8. Check force and coefficient convergence.
-9. Export aerodynamic coefficients.
-10. Compare with DSMC or analytical free-molecular results.
+face_surface_map.csv
 ```
 
----
-
-## 9. Output Files
-
-A typical simulation will generate the following files:
+The generated surface names are:
 
 ```text
-results/
-└── cube_basic/
-    ├── summary.csv
-    ├── force_history.csv
-    ├── moment_history.csv
-    ├── coefficients.csv
-    ├── particle_hits.csv
-    └── convergence.png
+x_minus
+x_plus
+y_minus
+y_plus
+z_minus
+z_plus
 ```
 
 ---
 
-### 9.1 Summary Output
+### 8.2 Step 2: Edit User Settings in `main.py`
 
-Example `summary.csv`:
-
-```csv
-case_name,altitude_km,num_particles,Cd,Cl,Cy,Fx,Fy,Fz,Mx,My,Mz
-cube_basic,300,100000,2.15,0.01,0.00,1.23e-6,2.0e-9,1.1e-8,0.0,0.0,0.0
-```
-
----
-
-### 9.2 Force Output
-
-Example `force_history.csv`:
-
-```csv
-particle_count,Fx,Fy,Fz
-10000,1.20e-6,2.3e-9,1.0e-8
-20000,1.22e-6,2.1e-9,1.2e-8
-30000,1.23e-6,2.0e-9,1.1e-8
-```
-
----
-
-### 9.3 Coefficient Output
-
-The drag coefficient is computed as:
-
-```math
-C_D = \frac{F_D}{\frac{1}{2}\rho V_\infty^2 A_{ref}}
-```
-
-The drag force can be computed as:
-
-```math
-F_D =
-\frac{1}{2}
-\rho V_\infty^2 A_{ref} C_D
-```
-
----
-
-## 10. Particle-Number Convergence Test
-
-Before using the result for scientific discussion, a particle-number convergence test is recommended.
-
-Example particle numbers:
+Open:
 
 ```text
-1e4
-5e4
-1e5
-5e5
-1e6
+TPMC/main.py
 ```
+
+Find the section:
+
+```python
+# ===== user settings =====
+```
+
+Edit the following parameters:
+
+```python
+stl_path = r"G:\我的雲端硬碟\TPMC\testcube.stl"
+atmosphere_path = r"G:\我的雲端硬碟\TPMC\nrlmsis_output.txt"
+face_map_csv = r"G:\我的雲端硬碟\TPMC\face_surface_map.csv"
+
+target_alt_km = 500.0
+scale_factor = 0.001
+
+yaw_deg = 0.0
+pitch_deg = 0.0
+roll_deg = 0.0
+
+n_particles = 50000
+seed = 42
+```
+
+For GitHub users, it is recommended to change the three file paths to local relative paths:
+
+```python
+base_dir = Path(__file__).resolve().parent
+
+stl_path = str(base_dir / "testcube.STL")
+atmosphere_path = str(base_dir / "nrlmsis_output.txt")
+face_map_csv = str(base_dir / "face_surface_map.csv")
+```
+
+---
+
+### 8.3 Step 3: Edit Reference Quantities
+
+In `main.py`, edit:
+
+```python
+ref = ReferenceConfig(
+    A_ref=1.0e-4,
+    L_ref=1.0e-2,
+    ref_point_body=np.array([0.0, 0.0, 0.0]),
+    drag_axis_body=np.array([1.0, 0.0, 0.0]),
+    side_axis_body=np.array([0.0, 1.0, 0.0]),
+    lift_axis_body=np.array([0.0, 0.0, 1.0]),
+)
+```
+
+Meaning:
+
+| Parameter | Meaning |
+|---|---|
+| `A_ref` | Reference area |
+| `L_ref` | Reference length |
+| `ref_point_body` | Moment reference point in body coordinates |
+| `drag_axis_body` | Drag-axis direction in body coordinates |
+| `side_axis_body` | Side-force-axis direction in body coordinates |
+| `lift_axis_body` | Lift-axis direction in body coordinates |
+
+For the current cube example:
+
+```python
+A_ref = 1.0e-4
+L_ref = 1.0e-2
+```
+
+which corresponds to a 10 mm × 10 mm reference area and a 10 mm reference length.
+
+---
+
+### 8.4 Step 4: Edit Free-Stream Velocity
+
+The current free-stream bulk velocity is defined as:
+
+```python
+bulk_velocity_world = np.array([7500.0, 0.0, 0.0])
+```
+
+This means the incoming gas flow is aligned with the positive x-direction in the world frame.
+
+The magnitude is:
+
+```text
+7500 m/s
+```
+
+---
+
+### 8.5 Step 5: Run the Main TPMC Simulation
 
 Run:
 
 ```bash
-python examples/convergence_test.py --config cases/cube_basic/config.yaml
+python main.py
 ```
 
-or manually modify the `number_of_particles` value in `config.yaml`.
+The terminal will print:
 
-The convergence criterion can be defined as:
+```text
+=== STL TPMC Single Run (NRLMSIS Atmosphere + Surface Model) ===
+```
+
+and show:
+
+- selected atmosphere altitude
+- surface model information
+- particle hit ratio
+- bounce count
+- geometry size
+- atmospheric density
+- temperature
+- species number densities
+- force components
+- moment components
+- aerodynamic coefficients
+
+---
+
+## 9. Output
+
+The current main script writes:
+
+```text
+TPMC/tpmc_stl_single_run.csv
+```
+
+This output includes:
+
+- STL path
+- atmosphere path
+- target altitude
+- selected atmosphere altitude
+- scale factor
+- attitude angle
+- particle number
+- hit count
+- hit ratio
+- total bounces
+- average bounces per hit
+- bounding-box size
+- source-plane area
+- force components
+- moment components
+- atmospheric density
+- dynamic pressure
+- reference area
+- reference length
+- drag force
+- side force
+- lift force
+- drag coefficient
+- side-force coefficient
+- lift coefficient
+- moment coefficients
+- species number densities
+
+Important output columns include:
+
+```text
+Fx, Fy, Fz
+Mx, My, Mz
+F_drag, F_side, F_lift
+Cd, Cy, Cl
+Cmx, Cmy, Cmz
+rho_inf, T_inf, q_inf
+n_O, n_N2, n_O2, n_He, n_Ar, n_H, n_N
+```
+
+---
+
+## 10. Typical Current Workflow
+
+The present recommended workflow is:
+
+```text
+1. Put STL file into TPMC folder.
+2. Prepare or update nrlmsis_output.txt.
+3. Generate face_surface_map.csv if needed.
+4. Edit file paths in main.py.
+5. Set target altitude.
+6. Set attitude angles.
+7. Set reference area and reference length.
+8. Set number of particles.
+9. Run main.py.
+10. Check terminal output.
+11. Open tpmc_stl_single_run.csv.
+12. Repeat with different altitude, attitude, or particle number.
+```
+
+---
+
+## 11. Particle-Number Convergence Test
+
+For scientific use, the number of TPMC particles should be tested.
+
+Suggested particle numbers:
+
+```text
+10000
+50000
+100000
+500000
+1000000
+```
+
+Change:
+
+```python
+n_particles = 50000
+```
+
+to different values and run:
+
+```bash
+python main.py
+```
+
+Compare the resulting drag coefficient:
+
+```text
+Cd
+```
+
+A practical convergence criterion is:
 
 ```math
 \left|
@@ -464,112 +680,31 @@ The convergence criterion can be defined as:
 \right| < 1\%
 ```
 
-A suggested convergence table is:
-
-| Number of particles | Drag coefficient | Difference |
-|---:|---:|---:|
-| 10,000 | 2.18 | - |
-| 50,000 | 2.14 | 1.83% |
-| 100,000 | 2.13 | 0.47% |
-| 500,000 | 2.12 | 0.47% |
-| 1,000,000 | 2.12 | 0.00% |
-
-If the drag coefficient changes by less than 1%, the result can be considered statistically converged for preliminary aerodynamic analysis.
-
 ---
 
-## 11. Altitude Sweep
+## 12. Altitude Sweep
 
-For LEO satellite applications, TPMC can be used to rapidly evaluate aerodynamic coefficients at different altitudes.
+The current code performs one altitude per run.
 
-Example altitude range:
+To perform an altitude sweep manually:
 
-```text
-150 km to 500 km
+1. Open `main.py`.
+2. Change:
+
+```python
+target_alt_km = 500.0
 ```
 
-Suggested interval:
-
-```text
-5 km or 10 km
-```
-
-Example workflow:
+3. Run:
 
 ```bash
-python examples/altitude_sweep.py --config cases/cube_basic/config.yaml --start 150 --end 500 --step 10
+python main.py
 ```
 
-The output may include:
+4. Save or rename the output CSV.
+5. Repeat for another altitude.
 
-```text
-results/altitude_sweep/Cd_vs_altitude.csv
-results/altitude_sweep/Cd_vs_altitude.png
-```
-
-The final result can be used to build an altitude-dependent aerodynamic coefficient model:
-
-```math
-C_D = C_D(h)
-```
-
-which can be used for orbital lifetime prediction.
-
----
-
-## 12. Attitude Sweep
-
-The aerodynamic coefficient of a satellite depends strongly on attitude.
-
-Example attitude angles:
-
-```text
-alpha = 0, 30, 60 deg
-beta  = 0, 30, 60 deg
-```
-
-Suggested cases:
-
-| Case | Angle of attack alpha | Sideslip angle beta |
-|---|---:|---:|
-| Case 00 | 0 deg | 0 deg |
-| Case 03 | 0 deg | 30 deg |
-| Case 06 | 0 deg | 60 deg |
-| Case 30 | 30 deg | 0 deg |
-| Case 33 | 30 deg | 30 deg |
-| Case 36 | 30 deg | 60 deg |
-| Case 60 | 60 deg | 0 deg |
-| Case 63 | 60 deg | 30 deg |
-| Case 66 | 60 deg | 60 deg |
-
-Example command:
-
-```bash
-python examples/attitude_sweep.py --config cases/cube_basic/config.yaml
-```
-
-The output can be used to generate:
-
-```text
-Cd(alpha, beta)
-Cl(alpha, beta)
-Cm(alpha, beta)
-```
-
----
-
-## 13. DSMC Reference Validation
-
-This project is intended to support future TPMC-DSMC comparison.
-
-A recommended validation strategy is:
-
-1. Run TPMC at many altitude points.
-2. Run DSMC only at selected reference altitudes.
-3. Compare converged aerodynamic coefficients.
-4. Identify the altitude or Knudsen-number range where TPMC remains valid.
-
-Example DSMC reference altitudes:
+Suggested altitude points:
 
 ```text
 125 km
@@ -579,194 +714,147 @@ Example DSMC reference altitudes:
 250 km
 300 km
 450 km
+500 km
 ```
 
-The relative difference can be calculated as:
-
-```math
-\eta =
-\frac{C_{D,\mathrm{TPMC}} - C_{D,\mathrm{DSMC}}}
-{C_{D,\mathrm{DSMC}}}
-\times 100\%
-```
-
-The comparison should be based on converged aerodynamic coefficients, not on identical particle numbers.
+Future versions may include an automatic altitude-sweep script.
 
 ---
 
-## 14. Example Research Use Case
+## 13. Attitude Sweep
 
-A typical research use case is:
+The current attitude is controlled by:
+
+```python
+yaw_deg = 0.0
+pitch_deg = 0.0
+roll_deg = 0.0
+```
+
+To perform an attitude sweep manually, change these values and rerun:
+
+```bash
+python main.py
+```
+
+Example cases:
+
+| Case | yaw | pitch | roll |
+|---|---:|---:|---:|
+| Case 000 | 0 | 0 | 0 |
+| Case yaw30 | 30 | 0 | 0 |
+| Case pitch30 | 0 | 30 | 0 |
+| Case roll30 | 0 | 0 | 30 |
+
+Future versions may include an automatic attitude-sweep script.
+
+---
+
+## 14. Important Notes for Current Version
+
+### 14.1 Hard-Coded Paths
+
+The current version of `main.py` uses hard-coded local Windows paths.
+
+Before another user can run the code, the paths must be changed.
+
+Recommended improvement:
+
+```python
+base_dir = Path(__file__).resolve().parent
+
+stl_path = str(base_dir / "testcube.STL")
+atmosphere_path = str(base_dir / "nrlmsis_output.txt")
+face_map_csv = str(base_dir / "face_surface_map.csv")
+```
+
+### 14.2 `desktop.ini` and `__pycache__`
+
+The repository currently contains files that are usually not needed for source-code sharing:
 
 ```text
-Objective:
-Estimate the drag coefficient of a CubeSat with and without a deployed drag sail.
+desktop.ini
+__pycache__/
+```
 
-Method:
-1. Import CubeSat STL geometry.
-2. Define orbital altitude and atmospheric conditions.
-3. Run TPMC particle-number convergence.
-4. Compute Cd for the no-sail case.
-5. Compute Cd for the deployed-sail case.
-6. Compare the increase in drag force.
-7. Select several altitudes for DSMC reference validation.
-8. Use Cd(h) for orbital lifetime analysis.
+It is recommended to remove these from the repository and keep them ignored by `.gitignore`.
+
+Recommended `.gitignore` entries:
+
+```gitignore
+__pycache__/
+*.pyc
+desktop.ini
+.venv/
+*.log
+```
+
+### 14.3 Case Configuration
+
+The current version does not yet use an external YAML or JSON configuration file.
+
+Simulation settings are currently edited directly in:
+
+```text
+TPMC/main.py
+```
+
+Future versions may move these settings into:
+
+```text
+config.yaml
+```
+
+or:
+
+```text
+config.json
 ```
 
 ---
 
 ## 15. Known Limitations
 
-The current TPMC solver has the following limitations:
+The current version has the following limitations:
 
-- It does not model intermolecular collisions.
-- It is not suitable for dense transitional flows.
-- It does not solve the full Boltzmann equation.
-- Accuracy decreases when the Knudsen number becomes small.
-- Complex multiple reflections may require sufficient particle sampling.
-- The result depends on the gas-surface interaction model.
-- Surface roughness, contamination, and material properties are not fully modeled unless specified.
-- Thermal re-emission models may need further development.
-
-For transitional flow regimes, DSMC should be used as a reference or replacement method.
-
----
-
-## 16. Recommended Validity Range
-
-TPMC is generally suitable for:
-
-```math
-Kn \gg 1
-```
-
-It may still be useful as a preliminary estimator when:
-
-```math
-Kn > 10
-```
-
-For:
-
-```math
-0.1 < Kn < 10
-```
-
-DSMC is recommended because intermolecular collisions become important.
-
-For:
-
-```math
-Kn < 0.1
-```
-
-continuum or slip-flow methods may be more appropriate, depending on the flow condition.
+- Script-based workflow.
+- File paths are still hard-coded in `main.py`.
+- No automatic parameter sweep script yet.
+- No formal package installation.
+- No external configuration file yet.
+- No unit-test framework yet.
+- No automatic DSMC comparison yet.
+- No graphical post-processing script yet.
+- TPMC does not model intermolecular collisions.
+- Accuracy decreases when the flow enters the transitional regime.
 
 ---
 
-## 17. Troubleshooting
+## 16. Future Development Plan
 
-### Problem 1: STL file cannot be loaded
+Planned future improvements include:
 
-Possible causes:
-
-- Wrong file path.
-- STL file is corrupted.
-- STL file uses unexpected units.
-- Required package `trimesh` is not installed.
-
-Try:
-
-```bash
-pip install trimesh
-```
-
-Check the geometry path in `config.yaml`.
+- Replace hard-coded paths with relative paths.
+- Add `requirements.txt`.
+- Add automatic altitude sweep.
+- Add automatic attitude sweep.
+- Add particle-number convergence script.
+- Add result plotting scripts.
+- Add configuration-file input.
+- Add example cases.
+- Add DSMC reference comparison.
+- Add more gas-surface interaction models.
+- Add GPU or C++ acceleration for particle tracing.
+- Add documentation for equations and validation.
 
 ---
 
-### Problem 2: The drag coefficient is extremely large or small
+## 17. Suggested Citation
 
-Possible causes:
-
-- Wrong reference area.
-- Wrong density.
-- Wrong velocity.
-- Geometry unit is incorrect.
-- Flow direction is incorrectly defined.
-- Surface normals are inconsistent.
-
-Check:
-
-```yaml
-geometry:
-  reference_area: 0.01
-  length_unit: m
-
-flow:
-  density: 1.92e-11
-  velocity: 7730.0
-  direction: [-1.0, 0.0, 0.0]
-```
-
----
-
-### Problem 3: Result changes strongly with particle number
-
-Possible causes:
-
-- Too few particles.
-- Complex geometry causes low hit rate.
-- Insufficient sampling of multiple reflections.
-- Large concave regions require more particles.
-
-Try increasing:
-
-```yaml
-simulation:
-  number_of_particles: 1000000
-```
-
----
-
-### Problem 4: The simulation is slow
-
-Possible solutions:
-
-- Reduce particle number for preliminary tests.
-- Use batch processing.
-- Simplify the STL geometry.
-- Remove unnecessary small geometric features.
-- Use vectorized intersection routines.
-- Consider future acceleration using C++, Numba, or GPU.
-
----
-
-## 18. Development Plan
-
-Planned future developments include:
-
-- DSMC reference-case comparison.
-- Altitude-dependent aerodynamic coefficient database.
-- Attitude-dependent force and moment database.
-- Improved gas-surface interaction models.
-- Support for mixed atmospheric species.
-- Multiple-reflection tracking.
-- GPU acceleration.
-- C++ backend for particle tracing.
-- Coupling with orbital decay analysis.
-- Validation against published DSMC and free-molecular-flow results.
-
----
-
-## 19. Citation
-
-If you use this code in academic work, please cite this repository.
-
-Recommended citation format:
+If you use this code in academic work, please cite:
 
 ```text
-Chen, Y.-H. TPMC-Sat-Aero: A Test Particle Monte Carlo Tool for Satellite Aerodynamic Coefficient Estimation. GitHub repository, 2026.
+Chen, Y.-H. TPMC-Sat-Aero: A Python-based Test Particle Monte Carlo Tool for Satellite Aerodynamic Coefficient Estimation. GitHub repository, 2026.
 ```
 
 BibTeX:
@@ -774,26 +862,16 @@ BibTeX:
 ```bibtex
 @misc{chen2026tpmcsataero,
   author       = {Chen, Yu-Hsiang},
-  title        = {TPMC-Sat-Aero: A Test Particle Monte Carlo Tool for Satellite Aerodynamic Coefficient Estimation},
+  title        = {TPMC-Sat-Aero: A Python-based Test Particle Monte Carlo Tool for Satellite Aerodynamic Coefficient Estimation},
   year         = {2026},
-  howpublished = {\url{https://github.com/your-username/tpmc-sat-aero}},
+  howpublished = {\url{https://github.com/yushangchen/tpmc-sat-aero}},
   note         = {GitHub repository}
 }
 ```
 
 ---
 
-## 20. License
-
-This project is released under the MIT License.
-
-Users are allowed to use, modify, and distribute the code, provided that the original copyright notice and license are retained.
-
-See the `LICENSE` file for details.
-
----
-
-## 21. Author
+## 18. Author
 
 **Yu-Hsiang Chen**  
 Department of Aeronautics and Astronautics  
@@ -803,16 +881,23 @@ Taiwan
 Research interests:
 
 - Rarefied gas dynamics
-- DSMC and TPMC methods
+- TPMC and DSMC methods
 - Satellite aerodynamics
 - CubeSat deorbit analysis
 - Experimental fluid mechanics
-- Bluff-body aerodynamics
 
 ---
 
-## 22. Disclaimer
+## 19. License
 
-This code is developed for academic and research purposes. The results should be verified carefully before being used for engineering design, mission analysis, or publication.
+This project is released under the MIT License.
 
-For transitional rarefied flows or low-altitude orbital conditions, DSMC or other higher-fidelity methods should be used for validation.
+See the `LICENSE` file for details.
+
+---
+
+## 20. Disclaimer
+
+This code is developed for academic and research purposes.
+
+The results should be verified before being used for engineering design, mission analysis, or publication. For transitional rarefied flows or low-altitude orbital conditions, DSMC or other higher-fidelity methods should be used for validation.
