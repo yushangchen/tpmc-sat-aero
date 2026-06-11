@@ -694,6 +694,38 @@ Suggested short GitHub description:
 > Rarefied aerodynamic analysis platform for CubeSats with TPMC/FMF solvers, batch workflow, standardized atmosphere interface, and aerodynamic database generation.
 
 ---
+## Author
+
+**Yu-Hsiang Chen**  
+Ph.D. Student, Department of Aeronautics and Astronautics, National Cheng Kung University (NCKU)  
+Research focus: rarefied aerodynamics, CubeSat aerodynamic modeling, TPMC / FMF methods, and aerodynamic database generation
+
+---
+
+## Maintainer
+
+**Yu-Hsiang Chen**  
+GitHub: [yushangchen](https://github.com/yushangchen)
+
+---
+
+## Contact
+
+For questions, suggestions, collaboration, or bug reports, please use one of the following channels:
+
+- GitHub Issues
+- GitHub Discussions (if enabled)
+- Email: `your_email_here`
+
+---
+
+## Citation
+
+If you use this repository in academic work, technical reports, or derived software, please cite it as:
+
+```text
+Yu-Hsiang Chen, TPMC-SAT-AERO: A Python-based rarefied aerodynamic analysis platform for CubeSat applications, GitHub repository, 2026.
+
 
 ## Final Note
 
