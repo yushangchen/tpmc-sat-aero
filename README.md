@@ -686,14 +686,6 @@ And to **exclude generated run folders**, for example:
 These are reproducible outputs and usually do not need to be committed.
 
 ---
-
-## Recommended Repository Description
-
-Suggested short GitHub description:
-
-> Rarefied aerodynamic analysis platform for CubeSats with TPMC/FMF solvers, batch workflow, standardized atmosphere interface, and aerodynamic database generation.
-
----
 ## Author
 
 **Yu-Hsiang Chen**  
