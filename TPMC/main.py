@@ -1,9 +1,7 @@
+from __future__ import annotations
+
 import csv
 from pathlib import Path
-import sys
-
-print("DEBUG USING PYTHON:", sys.executable)
-
 import numpy as np
 
 from geometry.loader import load_stl_mesh, recenter_mesh, scale_mesh, compute_bounding_box
@@ -11,17 +9,13 @@ from geometry.transform import rotate_mesh
 from physics.gsi import GSIConfig
 from physics.source import create_source_plane, sample_points_on_plane
 from physics.tracer import trace_particle
+from physics.fmf import trace_particle_fmf
 from physics.reference import (
     ReferenceConfig,
     body_to_world,
     project_force_axes,
     coefficient_force,
     coefficient_moment,
-)
-from physics.atmosphere_nrlmsis import (
-    get_nearest_state_from_file,
-    sample_species_from_state,
-    compute_total_incident_flux,
 )
 from physics.inflow import InflowConfig, sample_inflow_velocity
 from physics.coefficients import compute_dynamic_pressure
@@ -31,16 +25,15 @@ from physics.surface_model import (
     load_face_surface_csv,
 )
 
+from atmosphere.base import (
+    AtmosphereProvider,
+    sample_species_from_state,
+    compute_total_incident_flux,
+)
+from atmosphere.factory import build_atmosphere_provider
+
 
 def build_surface_model(face_map_csv: str | None) -> SurfaceModel:
-    """
-    Build per-face surface model.
-
-    For the cube test:
-    - x_minus : ram-facing face
-    - x_plus  : wake face
-    - y/z     : side faces
-    """
     face_to_surface = {}
 
     if face_map_csv is not None and Path(face_map_csv).exists():
@@ -56,8 +49,40 @@ def build_surface_model(face_map_csv: str | None) -> SurfaceModel:
                 alpha_t=0.5,
             ),
         ),
-        "x_minus": SurfaceDefinition(
-            name="x_minus",
+        "body": SurfaceDefinition(
+            name="body",
+            gsi=GSIConfig(
+                model="cll",
+                wall_temperature=300.0,
+                alpha_n=0.5,
+                alpha_t=0.5,
+            ),
+        ),
+        "solar_panel": SurfaceDefinition(
+            name="solar_panel",
+            gsi=GSIConfig(
+                model="cll",
+                wall_temperature=330.0,
+                alpha_n=0.7,
+                alpha_t=0.7,
+            ),
+        ),
+        "antenna": SurfaceDefinition(
+            name="antenna",
+            gsi=GSIConfig(
+                model="diffuse",
+                wall_temperature=290.0,
+            ),
+        ),
+        "drag_sail": SurfaceDefinition(
+            name="drag_sail",
+            gsi=GSIConfig(
+                model="diffuse",
+                wall_temperature=350.0,
+            ),
+        ),
+        "ram_face": SurfaceDefinition(
+            name="ram_face",
             gsi=GSIConfig(
                 model="cll",
                 wall_temperature=350.0,
@@ -65,15 +90,15 @@ def build_surface_model(face_map_csv: str | None) -> SurfaceModel:
                 alpha_t=0.8,
             ),
         ),
-        "x_plus": SurfaceDefinition(
-            name="x_plus",
+        "wake_face": SurfaceDefinition(
+            name="wake_face",
             gsi=GSIConfig(
                 model="diffuse",
                 wall_temperature=280.0,
             ),
         ),
-        "y_plus": SurfaceDefinition(
-            name="y_plus",
+        "side_y_plus": SurfaceDefinition(
+            name="side_y_plus",
             gsi=GSIConfig(
                 model="cll",
                 wall_temperature=300.0,
@@ -81,8 +106,8 @@ def build_surface_model(face_map_csv: str | None) -> SurfaceModel:
                 alpha_t=0.5,
             ),
         ),
-        "y_minus": SurfaceDefinition(
-            name="y_minus",
+        "side_y_minus": SurfaceDefinition(
+            name="side_y_minus",
             gsi=GSIConfig(
                 model="cll",
                 wall_temperature=300.0,
@@ -90,8 +115,8 @@ def build_surface_model(face_map_csv: str | None) -> SurfaceModel:
                 alpha_t=0.5,
             ),
         ),
-        "z_plus": SurfaceDefinition(
-            name="z_plus",
+        "top_face": SurfaceDefinition(
+            name="top_face",
             gsi=GSIConfig(
                 model="cll",
                 wall_temperature=300.0,
@@ -99,8 +124,8 @@ def build_surface_model(face_map_csv: str | None) -> SurfaceModel:
                 alpha_t=0.5,
             ),
         ),
-        "z_minus": SurfaceDefinition(
-            name="z_minus",
+        "bottom_face": SurfaceDefinition(
+            name="bottom_face",
             gsi=GSIConfig(
                 model="cll",
                 wall_temperature=300.0,
@@ -113,7 +138,7 @@ def build_surface_model(face_map_csv: str | None) -> SurfaceModel:
     surface_model = SurfaceModel(
         surfaces=surfaces,
         face_to_surface=face_to_surface,
-        default_surface="default",
+        default_surface="body",
     )
     surface_model.validate()
     return surface_model
@@ -129,12 +154,16 @@ def count_surface_faces(n_faces: int, surface_model: SurfaceModel) -> dict[str, 
 
 def run_stl_case(
     stl_path: str,
-    atmosphere_path: str,
+    atmosphere_provider: AtmosphereProvider,
     target_alt_km: float,
+    target_lat_deg: float,
+    target_lon_deg: float,
+    epoch: str | None,
     scale_factor: float,
     yaw_deg: float,
     pitch_deg: float,
     roll_deg: float,
+    solver_mode: str,
     surface_model: SurfaceModel,
     ref: ReferenceConfig,
     bulk_velocity_world: np.ndarray,
@@ -144,15 +173,21 @@ def run_stl_case(
     ref.validate()
     surface_model.validate()
 
-    # ---------- load atmosphere ----------
-    atm = get_nearest_state_from_file(atmosphere_path, target_alt_km)
+    solver_mode = str(solver_mode).lower()
+    if solver_mode not in ("tpmc", "fmf"):
+        raise ValueError(f"Unsupported solver_mode: {solver_mode}")
 
-    # ---------- load STL ----------
+    atm = atmosphere_provider.get_state(
+        target_alt_km=target_alt_km,
+        lat_deg=target_lat_deg,
+        lon_deg=target_lon_deg,
+        epoch=epoch,
+    )
+
     mesh0 = load_stl_mesh(stl_path)
-    mesh0 = scale_mesh(mesh0, scale_factor)  # mm -> m
+    mesh0 = scale_mesh(mesh0, scale_factor)
     mesh0 = recenter_mesh(mesh0, target_center=(0.0, 0.0, 0.0))
 
-    # ---------- rotate ----------
     mesh = rotate_mesh(
         mesh0,
         roll_deg=roll_deg,
@@ -161,7 +196,6 @@ def run_stl_case(
         origin=np.array([0.0, 0.0, 0.0]),
     )
 
-    # Validate face map indices against actual mesh
     n_faces = len(mesh.faces)
     for face_idx in surface_model.face_to_surface.keys():
         if face_idx >= n_faces:
@@ -172,16 +206,13 @@ def run_stl_case(
 
     surface_counts = count_surface_faces(n_faces, surface_model)
 
-    # ---------- geometry size ----------
     _, _, bbox_size, _ = compute_bounding_box(mesh.vertices)
     char_length = float(np.max(bbox_size))
 
-    # ---------- flow ----------
     bulk_velocity_world = np.asarray(bulk_velocity_world, dtype=float)
     flow_direction = bulk_velocity_world / np.linalg.norm(bulk_velocity_world)
     V_inf = float(np.linalg.norm(bulk_velocity_world))
 
-    # moment reference point: body -> world
     ref_point = body_to_world(
         ref.ref_point_body,
         roll_deg=roll_deg,
@@ -189,7 +220,6 @@ def run_stl_case(
         yaw_deg=yaw_deg,
     )
 
-    # ---------- source plane ----------
     margin = 1.0 * char_length
     padding = 0.25 * char_length
 
@@ -215,11 +245,9 @@ def run_stl_case(
     hit_count = 0
     total_bounces = 0
 
-    # ---------- tracer settings ----------
     max_bounces = 10
     eps_shift = max(1e-12, 1e-6 * char_length)
 
-    # ---------- particle loop ----------
     for origin in origins:
         species = sample_species_from_state(
             atm=atm,
@@ -242,20 +270,35 @@ def run_stl_case(
             rng=rng,
         )
 
-        trace = trace_particle(
-            ray_origin=origin,
-            v_in0=v_in0,
-            vertices=mesh.vertices,
-            faces=mesh.faces,
-            normals=mesh.normals,
-            molecular_mass=species.molecular_mass_kg,
-            sample_weight=sample_weight,
-            reference_point=ref_point,
-            rng=rng,
-            surface_model=surface_model,
-            max_bounces=max_bounces,
-            eps_shift=eps_shift,
-        )
+        if solver_mode == "tpmc":  # or "fmf"
+            trace = trace_particle(
+                ray_origin=origin,
+                v_in0=v_in0,
+                vertices=mesh.vertices,
+                faces=mesh.faces,
+                normals=mesh.normals,
+                molecular_mass=species.molecular_mass_kg,
+                sample_weight=sample_weight,
+                reference_point=ref_point,
+                rng=rng,
+                surface_model=surface_model,
+                max_bounces=max_bounces,
+                eps_shift=eps_shift,
+            )
+        else:
+            trace = trace_particle_fmf(
+                ray_origin=origin,
+                v_in0=v_in0,
+                vertices=mesh.vertices,
+                faces=mesh.faces,
+                normals=mesh.normals,
+                molecular_mass=species.molecular_mass_kg,
+                sample_weight=sample_weight,
+                reference_point=ref_point,
+                rng=rng,
+                surface_model=surface_model,
+                eps_shift=eps_shift,
+            )
 
         if trace.bounce_count == 0:
             continue
@@ -265,7 +308,6 @@ def run_stl_case(
         total_force += trace.total_force
         total_moment += trace.total_moment
 
-    # ---------- aerodynamic coefficients ----------
     rho_inf = atm.rho_total_kg_m3
     q_inf = compute_dynamic_pressure(rho_inf, V_inf)
 
@@ -290,9 +332,12 @@ def run_stl_case(
 
     return {
         "stl_path": str(stl_path),
-        "atmosphere_path": str(atmosphere_path),
+        "solver_mode": solver_mode,
+        "atmosphere_model": atmosphere_provider.provider_name,
         "target_alt_km": float(target_alt_km),
-        "selected_alt_km": float(atm.alt_km),
+        "target_lat_deg": float(target_lat_deg),
+        "target_lon_deg": float(target_lon_deg),
+        "selected_alt_km": float(atm.altitude_km),
         "selected_lat_deg": float(atm.lat_deg),
         "selected_lon_deg": float(atm.lon_deg),
 
@@ -352,6 +397,7 @@ def run_stl_case(
         "n_Ar": float(atm.species_number_density_m3.get("Ar", 0.0)),
         "n_H": float(atm.species_number_density_m3.get("H", 0.0)),
         "n_N": float(atm.species_number_density_m3.get("N", 0.0)),
+        "atm_source": atm.source,
     }
 
 
@@ -368,51 +414,53 @@ def save_result_to_csv(result: dict, filename: str = "tpmc_stl_single_run.csv"):
 
 
 def main():
-    # ===== user settings =====
-    def main():
-    # ===== user settings =====
-    base_dir = Path(__file__).resolve().parent
+    atmosphere_config = {
+        "type": "nrlmsis_txt",
+        "filepath": r"G:\我的雲端硬碟\TPMC\nrlmsis_output.txt",
+    }
 
-    stl_path = str(base_dir / "testcube.STL")
-    atmosphere_path = str(base_dir / "nrlmsis_output.txt")
-    face_map_csv = str(base_dir / "face_surface_map.csv")
+    stl_path = r"G:\我的雲端硬碟\TPMC\testcube.stl"
+    face_map_csv = r"G:\我的雲端硬碟\TPMC\face_surface_map.csv"
 
     target_alt_km = 500.0
+    target_lat_deg = 55.0
+    target_lon_deg = 45.0
+    epoch = "2026-05-12T00:00:00"
 
     scale_factor = 0.001
-
     yaw_deg = 0.0
     pitch_deg = 0.0
     roll_deg = 0.0
-
+    solver_mode = "tpmc"   # "tpmc" or "fmf"
     n_particles = 50000
     seed = 42
 
-    # ----- fixed reference quantities -----
     ref = ReferenceConfig(
-        A_ref=1.0e-4,                     # 10 mm × 10 mm frontal area
-        L_ref=1.0e-2,                     # 10 mm characteristic length
+        A_ref=1.0e-4,
+        L_ref=1.0e-2,
         ref_point_body=np.array([0.0, 0.0, 0.0]),
         drag_axis_body=np.array([1.0, 0.0, 0.0]),
         side_axis_body=np.array([0.0, 1.0, 0.0]),
         lift_axis_body=np.array([0.0, 0.0, 1.0]),
     )
 
-    # ----- orbit bulk velocity -----
     bulk_velocity_world = np.array([7500.0, 0.0, 0.0])
 
-    # ----- surface model -----
     surface_model = build_surface_model(face_map_csv)
-    # =========================
+    atmosphere_provider = build_atmosphere_provider(atmosphere_config)
 
     result = run_stl_case(
         stl_path=stl_path,
-        atmosphere_path=atmosphere_path,
+        atmosphere_provider=atmosphere_provider,
         target_alt_km=target_alt_km,
+        target_lat_deg=target_lat_deg,
+        target_lon_deg=target_lon_deg,
+        epoch=epoch,
         scale_factor=scale_factor,
         yaw_deg=yaw_deg,
         pitch_deg=pitch_deg,
         roll_deg=roll_deg,
+        solver_mode=solver_mode,
         surface_model=surface_model,
         ref=ref,
         bulk_velocity_world=bulk_velocity_world,
@@ -420,10 +468,13 @@ def main():
         seed=seed,
     )
 
-    print("=== STL TPMC Single Run (NRLMSIS Atmosphere + Surface Model) ===")
+    print("=== STL Single Run ===")
+    print("solver_mode        :", result["solver_mode"])
     print("stl_path           :", result["stl_path"])
-    print("atmosphere_path    :", result["atmosphere_path"])
+    print("atmosphere_model   :", result["atmosphere_model"])
     print("target_alt_km      :", result["target_alt_km"])
+    print("target_lat_deg     :", result["target_lat_deg"])
+    print("target_lon_deg     :", result["target_lon_deg"])
     print("selected_alt_km    :", result["selected_alt_km"])
     print("selected_lat_deg   :", result["selected_lat_deg"])
     print("selected_lon_deg   :", result["selected_lon_deg"])
@@ -488,10 +539,13 @@ def main():
     print("Cmy                :", result["Cmy"])
     print("Cmz                :", result["Cmz"])
 
-    csv_path = save_result_to_csv(result)
+    csv_name = f"stl_single_run_{solver_mode}.csv"
+    csv_path = save_result_to_csv(result, filename=csv_name)
     print()
     print(f"CSV saved to: {csv_path}")
 
 
 if __name__ == "__main__":
+    import sys
+    print("DEBUG USING PYTHON:", sys.executable)
     main()

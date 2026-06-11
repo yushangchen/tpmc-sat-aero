@@ -1,0 +1,80 @@
+{
+  "stl_path": "G:\\我的雲端硬碟\\TPMC\\satellite.stl",
+  "output_csv": "G:\\我的雲端硬碟\\TPMC\\face_surface_map.csv",
+  "debug_csv": "G:\\我的雲端硬碟\\TPMC\\face_surface_debug.csv",
+
+  "scale_factor": 0.001,
+  "recenter_to_origin": true,
+  "default_surface": "body",
+
+  "rules": [
+    {
+      "surface_name": "solar_panel",
+      "dominant_axis": {
+        "axis": "y",
+        "sign": "plus",
+        "min_abs_component": 0.85
+      },
+      "centroid_box": {
+        "min": [-0.20, 0.065, -0.20],
+        "max": [0.20, 0.30, 0.20]
+      }
+    },
+    {
+      "surface_name": "solar_panel",
+      "dominant_axis": {
+        "axis": "y",
+        "sign": "minus",
+        "min_abs_component": 0.85
+      },
+      "centroid_box": {
+        "min": [-0.20, -0.30, -0.20],
+        "max": [0.20, -0.065, 0.20]
+      }
+    },
+    {
+      "surface_name": "solar_panel",
+      "dominant_axis": {
+        "axis": "x",
+        "sign": "plus",
+        "min_abs_component": 0.85
+      },
+      "centroid_box": {
+        "min": [0.065, -0.20, -0.20],
+        "max": [0.30, 0.20, 0.20]
+      }
+    },
+    {
+      "surface_name": "solar_panel",
+      "dominant_axis": {
+        "axis": "x",
+        "sign": "minus",
+        "min_abs_component": 0.85
+      },
+      "centroid_box": {
+        "min": [-0.30, -0.20, -0.20],
+        "max": [-0.065, 0.20, 0.20]
+      }
+    },
+    {
+      "surface_name": "antenna",
+      "centroid_box": {
+        "min": [-0.04, -0.04, -0.25],
+        "max": [0.04, 0.04, -0.12]
+      },
+      "area_range": {
+        "max": 4.0e-5
+      }
+    },
+    {
+      "surface_name": "drag_sail",
+      "centroid_box": {
+        "min": [-0.30, -0.30, 0.18],
+        "max": [0.30, 0.30, 0.60]
+      },
+      "area_range": {
+        "min": 2.0e-5
+      }
+    }
+  ]
+}
